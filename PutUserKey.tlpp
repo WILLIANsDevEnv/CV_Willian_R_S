@@ -1,19 +1,19 @@
 #include 'totvs.ch'
-
+//TESTE
 //-------------------------------------------------------------------
 /*/{Protheus.doc} PutUserKey
-FunÁ„o para alterar senha de usu·rio via API TOTVS
+Fun√ß√£o para alterar senha de usu√°rio via API TOTVS
 @type User Function
 @author Willian - AsSystem
 @since 19/08/2025
 @modified 21/08/2025 by Willian - AsSystem
-@param cUserId, character, CÛdigo do usu·rio
+@param cUserId, character, C√≥digo do usu√°rio
 @param cNewPassword, character, Nova senha
 @return logical, .T. se sucesso, .F. se erro
 /*/
 //-------------------------------------------------------------------
 User Function PutUserKey(cUserId, cNewPassword)
-	// DeclaraÁ„o de vari·veis
+	// Declara√ß√£o de vari√°veis
 	Local lRet := .F. as Logical
 	Local oRestClient as Object
 	Local cUrlBase := "" as Character
@@ -24,43 +24,43 @@ User Function PutUserKey(cUserId, cNewPassword)
 	Local cError := "" as Character
 	Local cEmail := "" as Character
 	Local aHeadString := {} as Array
-	Local cCodUserAdmin := "" as Character // CÛdigo do usu·rio administrador
-	Local lOutProtheus := .F. as Logical // Vari·vel para indicar se o ambiente foi configurado via RPCSetEnv
-	Local lUserCFGAccess := .F. as Logical // Vari·vel para indicar se o usu·rio tem acesso ao mÛdulo Configurador
-	Local cAuthUser := "" as Character // Usu·rio para autenticaÁ„o na API
-	Local cAuthPass := "" as Character // Senha para autenticaÁ„o na API
-	Local cAuthString := "" as Character // String de autenticaÁ„o
+	Local cCodUserAdmin := "" as Character // C√≥digo do usu√°rio administrador
+	Local lOutProtheus := .F. as Logical // Vari√°vel para indicar se o ambiente foi configurado via RPCSetEnv
+	Local lUserCFGAccess := .F. as Logical // Vari√°vel para indicar se o usu√°rio tem acesso ao m√≥dulo Configurador
+	Local cAuthUser := "" as Character // Usu√°rio para autentica√ß√£o na API
+	Local cAuthPass := "" as Character // Senha para autentica√ß√£o na API
+	Local cAuthString := "" as Character // String de autentica√ß√£o
 
-	Default cUserId := "000002" // CÛdigo do usu·rio para TESTES
+	Default cUserId := "000002" // C√≥digo do usu√°rio para TESTES
 	Default cNewPassword := "7000" // Nova senha para TESTES
 
-	cAuthUser := "admin" // Usu·rio para autenticaÁ„o na API (TESTES)
-	cAuthPass := "7000" // Senha para autenticaÁ„o na API (TESTES)
+	cAuthUser := "admin" // Usu√°rio para autentica√ß√£o na API (TESTES)
+	cAuthPass := "7000" // Senha para autentica√ß√£o na API (TESTES)
 
-	// Verifica se o ambiente j· est· configurado (TESTES via Job)
+	// Verifica se o ambiente j√° est√° configurado (TESTES via Job)
 	If Select("SX2") <= 0
 		RPCSetEnv("99" /*Grupo*/, "01" /*Filial*/, )
-		lOutProtheus := .T. // Vari·vel para indicar que o ambiente foi configurado via RPCSetEnv
+		lOutProtheus := .T. // Vari√°vel para indicar que o ambiente foi configurado via RPCSetEnv
 	EndIf
 
 	If Empty(__cUserID)
-		cCodUserAdmin := "000001" // CÛdigo do usu·rio administrador para TESTES
+		cCodUserAdmin := "000001" // C√≥digo do usu√°rio administrador para TESTES
 	Else
 		cCodUserAdmin := AllTrim(__cUserID)
 	EndIf
 
-	// ValidaÁ„o dos par‚metros
+	// Valida√ß√£o dos par√¢metros
 	If Empty(cUserId) .Or. Empty(cNewPassword)
-		ConOut("Informar o cÛdigo do usu·rio e a nova senha.")
+		ConOut("Informar o c√≥digo do usu√°rio e a nova senha.")
 		Return .F.
 	EndIf
 
-	lUserCFGAccess := User_CFGAccess(cCodUserAdmin) // Verifica se o usu·rio corrente tem acesso ao mÛdulo Configurador
+	lUserCFGAccess := User_CFGAccess(cCodUserAdmin) // Verifica se o usu√°rio corrente tem acesso ao m√≥dulo Configurador
 
-	// Valida se o usu·rio corrente tem acesso ao mÛdulo Configurador
+	// Valida se o usu√°rio corrente tem acesso ao m√≥dulo Configurador
 	If !(lUserCFGAccess)
-		ConOut("Usu·rio '" + cCodUserAdmin + "' n„o tem permiss„o para alterar a senha de outros usu·rios." + CRLF + ;
-			"… necess·rio acesso ao mÛdulo Configurador (99).")
+		ConOut("Usu√°rio '" + cCodUserAdmin + "' n√£o tem permiss√£o para alterar a senha de outros usu√°rios." + CRLF + ;
+			"√â necess√°rio acesso ao m√≥dulo Configurador (99).")
 		Return .F.
 	EndIf
 
@@ -70,16 +70,16 @@ User Function PutUserKey(cUserId, cNewPassword)
 	cEmail := UsrRetMail(cUserId)
 
 	IF Empty(cEmail)
-		ConOut("Cadastre o email do usu·rio '" + cUserId + "' antes de alterar a senha.")
+		ConOut("Cadastre o email do usu√°rio '" + cUserId + "' antes de alterar a senha.")
 		Return .F.
 	EndIf
 
-	// Monta o corpo da requisiÁ„o JSON
+	// Monta o corpo da requisi√ß√£o JSON
 	oJsonBody := JsonObject():New()
 	oJsonBody['password'] := AllTrim(cNewPassword)
 	oJsonBody['emails'] := {}
 
-	// Adiciona o email do usu·rio ao array
+	// Adiciona o email do usu√°rio ao array
 	oJsonAux := JsonObject():New()
 	oJsonAux['value']   := AllTrim(cEmail)
 	oJsonAux['type']    := "work"
@@ -95,21 +95,21 @@ User Function PutUserKey(cUserId, cNewPassword)
 	// Configura headers
 	oRestClient:setPath(cUrlEndPoint)
 
-	// Adiciona headers necess·rios
+	// Adiciona headers necess√°rios
 	AAdd(aHeadString, "Content-Type: application/json; charset=utf-8")
 	AAdd(aHeadString, "Accept: application/json")
 
-	// Chama a funÁ„o getToken para obter o token de autenticaÁ„o, e adiciona o header de autorizaÁ„o
+	// Chama a fun√ß√£o getToken para obter o token de autentica√ß√£o, e adiciona o header de autoriza√ß√£o
 	cAuthString := getToken(AllTrim(cAuthUser), AllTrim(cAuthPass))
 	AAdd(aHeadString, "Authorization: Bearer " + AllTrim(cAuthString))
 
-	// Executa a requisiÁ„o PUT
+	// Executa a requisi√ß√£o PUT
 	If oRestClient:Put(aHeadString, cBody)
 		cResponse := oRestClient:GetResult()
 
 		// Verifica se houve sucesso
 		If oRestClient:GetHTTPCode() == "200"
-			ConOut("Senha alterada com sucesso para o usu·rio: " + cUserId)
+			ConOut("Senha alterada com sucesso para o usu√°rio: " + cUserId)
 			lRet := .T.
 		Else
 			cError := "HTTP " + cValToChar(oRestClient:GetHTTPCode()) + ": " + cResponse
@@ -117,7 +117,7 @@ User Function PutUserKey(cUserId, cNewPassword)
 		EndIf
 	Else
 		cError := oRestClient:GetLastError()
-		ConOut("Erro na requisiÁ„o: " + cError)
+		ConOut("Erro na requisi√ß√£o: " + cError)
 	EndIf
 
 	// Libera objeto
@@ -133,14 +133,14 @@ Return lRet
 
 //-------------------------------------------------------------------
 /*/{Protheus.doc} getToken
-Usa o mÈtodo POST de "/api/oauth2/v1/token" para obter um token de acesso
+Usa o m√©todo POST de "/api/oauth2/v1/token" para obter um token de acesso
 @type Static Function
 @author Alison Kaique
 @since 19/02/2022
 @modified 21/08/2025 by Willian - AsSystem
-@param cAuthUser, character, CÛdigo do usu·rio de AutenticaÁ„o
-@param cAuthPass, character, Senha do usu·rio de AutenticaÁ„o
-@return logical, .T. se obteve o token, .F. se n„o obteve
+@param cAuthUser, character, C√≥digo do usu√°rio de Autentica√ß√£o
+@param cAuthPass, character, Senha do usu√°rio de Autentica√ß√£o
+@return logical, .T. se obteve o token, .F. se n√£o obteve
 /*/
 //-------------------------------------------------------------------
 Static Function getToken(cUserName, cPassword)
@@ -192,12 +192,12 @@ Return cToken
 
 //-------------------------------------------------------------------
 /*/{Protheus.doc} User_CFGAccess
-Valida se o usu·rio tem acesso ao mÛdulo Configurador via query SQL
+Valida se o usu√°rio tem acesso ao m√≥dulo Configurador via query SQL
 @type Static Function
 @author Willian - AsSystem
 @since 19/08/2025
-@param cCodUser, character, CÛdigo do usu·rio a ser validado
-@return logical, .T. se tem acesso, .F. se n„o tem
+@param cCodUser, character, C√≥digo do usu√°rio a ser validado
+@return logical, .T. se tem acesso, .F. se n√£o tem
 /*/
 //-------------------------------------------------------------------
 Static Function User_CFGAccess(cCodUser)
@@ -208,7 +208,7 @@ Static Function User_CFGAccess(cCodUser)
 
 	cAlias := GetNextAlias()
 
-	// Monta a query para validar acesso ao mÛdulo Configurador
+	// Monta a query para validar acesso ao m√≥dulo Configurador
 	cQuery := "SELECT "
 	cQuery += "	CASE "
 	cQuery += "		WHEN EXISTS ( "
@@ -223,7 +223,7 @@ Static Function User_CFGAccess(cCodUser)
 	cQuery += "			WHERE USR.USR_ID = '" + AllTrim(cCodUser) + "' "
 	cQuery += "				AND USR.USR_MSBLQL != '1' "
 	cQuery += "				AND USR.D_E_L_E_T_ = ' ' "
-	cQuery += "				AND USRMOD.USR_MODULO = '99' " // MÛdulo Configurador
+	cQuery += "				AND USRMOD.USR_MODULO = '99' " // M√≥dulo Configurador
 	cQuery += "				AND USRMOD.USR_ACESSO = 'T' "
 	cQuery += "				AND USRMOD.D_E_L_E_T_ = ' ' "
 	cQuery += "		) "
@@ -237,13 +237,14 @@ Static Function User_CFGAccess(cCodUser)
 
 	nResultado := (cAlias)->RESULTADO
 
-	// Se resultado = 0, significa que o usu·rio TEM acesso ao SIGACFG
-	// Se resultado = 1, significa que o usu·rio N√O TEM acesso ao SIGACFG
+	// Se resultado = 0, significa que o usu√°rio TEM acesso ao SIGACFG
+	// Se resultado = 1, significa que o usu√°rio N√ÉO TEM acesso ao SIGACFG
 	If (nResultado == 0)
 		lTemAcesso := .T.
 	EndIf
 
-	// Fecha ·rea de trabalho
+	// Fecha √°rea de trabalho
 	(cAlias)->(DbCloseArea())
 
 Return lTemAcesso
+
