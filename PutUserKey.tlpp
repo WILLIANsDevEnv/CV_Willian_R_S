@@ -1,0 +1,249 @@
+#include 'totvs.ch'
+
+//-------------------------------------------------------------------
+/*/{Protheus.doc} PutUserKey
+Função para alterar senha de usuário via API TOTVS
+@type User Function
+@author Willian - AsSystem
+@since 19/08/2025
+@modified 21/08/2025 by Willian - AsSystem
+@param cUserId, character, Código do usuário
+@param cNewPassword, character, Nova senha
+@return logical, .T. se sucesso, .F. se erro
+/*/
+//-------------------------------------------------------------------
+User Function PutUserKey(cUserId, cNewPassword)
+	// Declaração de variáveis
+	Local lRet := .F. as Logical
+	Local oRestClient as Object
+	Local cUrlBase := "" as Character
+	Local cUrlEndPoint := "" as Character
+	Local cBody := "" as Character
+	Local cResponse := "" as Character
+	Local oJsonBody, oJsonAux as Object
+	Local cError := "" as Character
+	Local cEmail := "" as Character
+	Local aHeadString := {} as Array
+	Local cCodUserAdmin := "" as Character // Código do usuário administrador
+	Local lOutProtheus := .F. as Logical // Variável para indicar se o ambiente foi configurado via RPCSetEnv
+	Local lUserCFGAccess := .F. as Logical // Variável para indicar se o usuário tem acesso ao módulo Configurador
+	Local cAuthUser := "" as Character // Usuário para autenticação na API
+	Local cAuthPass := "" as Character // Senha para autenticação na API
+	Local cAuthString := "" as Character // String de autenticação
+
+	Default cUserId := "000002" // Código do usuário para TESTES
+	Default cNewPassword := "7000" // Nova senha para TESTES
+
+	cAuthUser := "admin" // Usuário para autenticação na API (TESTES)
+	cAuthPass := "7000" // Senha para autenticação na API (TESTES)
+
+	// Verifica se o ambiente já está configurado (TESTES via Job)
+	If Select("SX2") <= 0
+		RPCSetEnv("99" /*Grupo*/, "01" /*Filial*/, )
+		lOutProtheus := .T. // Variável para indicar que o ambiente foi configurado via RPCSetEnv
+	EndIf
+
+	If Empty(__cUserID)
+		cCodUserAdmin := "000001" // Código do usuário administrador para TESTES
+	Else
+		cCodUserAdmin := AllTrim(__cUserID)
+	EndIf
+
+	// Validação dos parâmetros
+	If Empty(cUserId) .Or. Empty(cNewPassword)
+		ConOut("Informar o código do usuário e a nova senha.")
+		Return .F.
+	EndIf
+
+	lUserCFGAccess := User_CFGAccess(cCodUserAdmin) // Verifica se o usuário corrente tem acesso ao módulo Configurador
+
+	// Valida se o usuário corrente tem acesso ao módulo Configurador
+	If !(lUserCFGAccess)
+		ConOut("Usuário '" + cCodUserAdmin + "' não tem permissão para alterar a senha de outros usuários." + CRLF + ;
+			"É necessário acesso ao módulo Configurador (99).")
+		Return .F.
+	EndIf
+
+	cURLBase := "https://localhost:8087/rest"
+	cUrlEndPoint := "/api/framework/v1/users/" + AllTrim(cUserId)
+
+	cEmail := UsrRetMail(cUserId)
+
+	IF Empty(cEmail)
+		ConOut("Cadastre o email do usuário '" + cUserId + "' antes de alterar a senha.")
+		Return .F.
+	EndIf
+
+	// Monta o corpo da requisição JSON
+	oJsonBody := JsonObject():New()
+	oJsonBody['password'] := AllTrim(cNewPassword)
+	oJsonBody['emails'] := {}
+
+	// Adiciona o email do usuário ao array
+	oJsonAux := JsonObject():New()
+	oJsonAux['value']   := AllTrim(cEmail)
+	oJsonAux['type']    := "work"
+	oJsonAux['primary'] := .T.
+
+	AAdd(oJsonBody['emails'], oJsonAux)
+
+	cBody := oJsonBody:ToJson()
+
+	// Cria o cliente REST
+	oRestClient := FWRest():New(cURLBase)
+
+	// Configura headers
+	oRestClient:setPath(cUrlEndPoint)
+
+	// Adiciona headers necessários
+	AAdd(aHeadString, "Content-Type: application/json; charset=utf-8")
+	AAdd(aHeadString, "Accept: application/json")
+
+	// Chama a função getToken para obter o token de autenticação, e adiciona o header de autorização
+	cAuthString := getToken(AllTrim(cAuthUser), AllTrim(cAuthPass))
+	AAdd(aHeadString, "Authorization: Bearer " + AllTrim(cAuthString))
+
+	// Executa a requisição PUT
+	If oRestClient:Put(aHeadString, cBody)
+		cResponse := oRestClient:GetResult()
+
+		// Verifica se houve sucesso
+		If oRestClient:GetHTTPCode() == "200"
+			ConOut("Senha alterada com sucesso para o usuário: " + cUserId)
+			lRet := .T.
+		Else
+			cError := "HTTP " + cValToChar(oRestClient:GetHTTPCode()) + ": " + cResponse
+			ConOut("Erro ao alterar senha: " + cError)
+		EndIf
+	Else
+		cError := oRestClient:GetLastError()
+		ConOut("Erro na requisição: " + cError)
+	EndIf
+
+	// Libera objeto
+	FreeObj(oRestClient)
+	FreeObj(oJsonBody)
+
+	If lOutProtheus
+		// Se o ambiente foi configurado via RPCSetEnv, limpar o ambiente
+		RpcClearEnv()
+	EndIf
+
+Return lRet
+
+//-------------------------------------------------------------------
+/*/{Protheus.doc} getToken
+Usa o método POST de "/api/oauth2/v1/token" para obter um token de acesso
+@type Static Function
+@author Alison Kaique
+@since 19/02/2022
+@modified 21/08/2025 by Willian - AsSystem
+@param cAuthUser, character, Código do usuário de Autenticação
+@param cAuthPass, character, Senha do usuário de Autenticação
+@return logical, .T. se obteve o token, .F. se não obteve
+/*/
+//-------------------------------------------------------------------
+Static Function getToken(cUserName, cPassword)
+    Local cToken := "" as Character // Bearer Token
+    Local cBaseURL := "" as Character // Base URL
+    Local cPath := "" as Character // endpoint path
+    Local cGrantType := "" as Character // grant type
+    Local cResponse := "" as Character // response
+    Local cStatus := "" as Character // status code
+    Local cError := "" as Character // error message
+    Local oRest as Object // FWRest() object
+    Local jResponse as Json // response JsonObject
+    Local aHeader := {} as Array // request header
+ 
+    // set values
+    cGrantType := "password" // type here grant type to request
+    cBaseURL   := "https://localhost:8087/rest" // type here your base URL
+    cPath      := "/api/oauth2/v1/token?grant_type=" + cGrantType + "&username=" + cUserName + "&password=" + cPassword // type here token endpoint
+
+    Aadd(aHeader, "Authorization: Basic " + Encode64(cUserName + ":" + cPassword))
+    Aadd(aHeader, "Content-Type: application/json")
+
+    // FWRest() object
+    oRest := FWRest():New(cBaseURL)
+    oRest:setPath(cPath)
+ 
+    // request
+    If (oRest:Post(aHeader))
+        cResponse := oRest:GetResult()
+        jResponse := JsonObject():New()
+ 
+        // is possible access this properties in response
+        /**
+            expires_in
+            token_type
+            scope
+            access_token
+            refresh_token
+        **/
+ 
+        If (ValType(jResponse:fromJson(cResponse)) == 'U')
+            cToken := jResponse['access_token']
+        EndIf
+    Else
+        cError  := oRest:GetLastError()
+        cStatus := oRest:GetHTTPCode()
+    EndIf
+Return cToken
+
+//-------------------------------------------------------------------
+/*/{Protheus.doc} User_CFGAccess
+Valida se o usuário tem acesso ao módulo Configurador via query SQL
+@type Static Function
+@author Willian - AsSystem
+@since 19/08/2025
+@param cCodUser, character, Código do usuário a ser validado
+@return logical, .T. se tem acesso, .F. se não tem
+/*/
+//-------------------------------------------------------------------
+Static Function User_CFGAccess(cCodUser)
+	Local lTemAcesso := .F. as Logical
+	Local cQuery := "" as Character
+	Local cAlias := "" as Character
+	Local nResultado := 1 as Numeric
+
+	cAlias := GetNextAlias()
+
+	// Monta a query para validar acesso ao módulo Configurador
+	cQuery := "SELECT "
+	cQuery += "	CASE "
+	cQuery += "		WHEN EXISTS ( "
+	cQuery += "			SELECT "
+	cQuery += "				USR.USR_ID, "
+	cQuery += "				USR.USR_NOME, "
+	cQuery += "				USRMOD.USR_MODULO, "
+	cQuery += "				USRMOD.USR_ACESSO "
+	cQuery += "			FROM SYS_USR AS USR "
+	cQuery += "			INNER JOIN SYS_USR_MODULE AS USRMOD "
+	cQuery += "				ON USR.USR_ID = USRMOD.USR_ID "
+	cQuery += "			WHERE USR.USR_ID = '" + AllTrim(cCodUser) + "' "
+	cQuery += "				AND USR.USR_MSBLQL != '1' "
+	cQuery += "				AND USR.D_E_L_E_T_ = ' ' "
+	cQuery += "				AND USRMOD.USR_MODULO = '99' " // Módulo Configurador
+	cQuery += "				AND USRMOD.USR_ACESSO = 'T' "
+	cQuery += "				AND USRMOD.D_E_L_E_T_ = ' ' "
+	cQuery += "		) "
+	cQuery += "		THEN 0 "
+	cQuery += "		ELSE 1 "
+	cQuery += "	END AS RESULTADO "
+
+	DbUseArea(.T., "TOPCONN", TCGenQry(,, cQuery), (cAlias), .F., .T.)
+
+	dbSelectArea(cAlias)
+
+	nResultado := (cAlias)->RESULTADO
+
+	// Se resultado = 0, significa que o usuário TEM acesso ao SIGACFG
+	// Se resultado = 1, significa que o usuário NÃO TEM acesso ao SIGACFG
+	If (nResultado == 0)
+		lTemAcesso := .T.
+	EndIf
+
+	// Fecha área de trabalho
+	(cAlias)->(DbCloseArea())
+
+Return lTemAcesso
